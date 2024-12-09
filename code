@@ -1,0 +1,80 @@
+import pandas as pd
+from moviepy.video.io.VideoFileClip import VideoFileClip
+import os
+
+# Define the path to your CSV file
+file_path = r"C:\Users\HP\Desktop\Ayushi_Clipped Video\08042024\08042024.csv"
+output_dir = r"C:\Users\HP\Desktop\Ayushi_Clipped Video\08042024"
+
+# Load the CSV file
+data = pd.read_csv(file_path)
+
+# Ensure output directory exists
+os.makedirs(output_dir, exist_ok=True)
+
+# Helper function to convert timestamp to seconds
+def timestamp_to_seconds(timestamp):
+    parts = timestamp.split(":")
+    if len(parts) == 3:  # Format hh:mm:ss
+        return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+    elif len(parts) == 2:  # Format mm:ss (assume hours = 0)
+        return int(parts[0]) * 60 + int(parts[1])
+    else:
+        raise ValueError(f"Unexpected timestamp format: {timestamp}")
+
+# Helper function to clip videos
+def clip_video(input_path, start_time, end_time, output_path):
+    with VideoFileClip(input_path) as video:
+        # Ensure the start and end times are within the duration of the video
+        start_time = max(0, start_time)
+        end_time = min(video.duration, end_time)
+        clipped_video = video.subclip(start_time, end_time)
+        clipped_video.write_videofile(output_path, codec="libx264")
+
+# Loop over each row in the CSV
+for index, row in data.iterrows():
+    try:
+        # Extract necessary information
+        tsc_fp = row['tsc_fp']
+        tsl_fp = row['tsl_fp']
+        ts_c = row['ts_c'].replace(":", "-")  # Replace ":" with "-" for valid folder names
+        cts_lv = row['cts_lv'].replace(":", "-")  # Replace ":" with "-" for valid folder names
+        vt = row['vt']
+        date = row['Date'].replace(":", "-")  # Ensure date has valid characters if needed
+        tsc = row['tsc']
+        tsl = row['tsl']
+
+        # Calculate start and end times for closeup video clipping
+        closeup_timestamp = timestamp_to_seconds(tsc)
+        closeup_start_time = closeup_timestamp - 1
+        closeup_end_time = closeup_timestamp + 1
+
+        # Calculate start and end times for long vision video clipping
+        long_vision_timestamp = timestamp_to_seconds(tsl)
+        long_vision_start_time = long_vision_timestamp - 8
+        long_vision_end_time = long_vision_timestamp + 2
+
+        # Define the folder name for this pair of clips
+        folder_name = f"{ts_c}({cts_lv}){date}"
+        folder_path = os.path.join(output_dir, folder_name)
+        os.makedirs(folder_path, exist_ok=True)
+
+        # Define filenames for the output clips
+        closeup_clip_name = f"{vt}_{ts_c}.mp4"
+        closeup_clip_path = os.path.join(folder_path, closeup_clip_name)
+
+        long_vision_clip_name = f"{vt}_{cts_lv}.mp4"
+        long_vision_clip_path = os.path.join(folder_path, long_vision_clip_name)
+
+        # Clip the closeup video
+        clip_video(tsc_fp, closeup_start_time, closeup_end_time, closeup_clip_path)
+
+        # Clip the long vision video
+        clip_video(tsl_fp, long_vision_start_time, long_vision_end_time, long_vision_clip_path)
+        
+    except ValueError as e:
+        print(f"Error in row {index}: {e}")
+    except Exception as e:
+        print(f"Unexpected error in row {index}: {e}")
+
+print("Video clipping completed.")
